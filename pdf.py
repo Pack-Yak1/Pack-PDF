@@ -9,6 +9,14 @@ import traceback
 import logging
 import os
 
+HOME_DIR = os.getcwd()
+try:
+    os.mkdir(os.path.join(HOME_DIR, "temp"))
+except FileExistsError:
+    pass
+finally:
+    TEMP_DIR = os.path.join(HOME_DIR, "temp")
+LOG_FILE = os.path.join(HOME_DIR, "logs.txt")
 
 # Supported image formats (besides .jpg)
 SUPPORTED_FORMATS = [".png", ".jpeg", ".bmp"]
@@ -41,6 +49,7 @@ class AddressHolder:
         self.savePath = ""
         self.nameDisplay = StringVar()
         self.saveDisplay = StringVar()
+        self.createdFiles = set()
 
     def updateImageNames(self):
         self.imageNames = list(
@@ -58,6 +67,13 @@ class AddressHolder:
             filetypes=[("PDF", "*.pdf")]
         )
         self.saveDisplay.set(self.savePath)
+
+    def reset(self):
+        self.imageNames = []
+        self.savePath = ""
+        self.nameDisplay.set("")
+        self.saveDisplay.set("")
+        self.createdFiles.clear()
 
 
 data = AddressHolder()
@@ -82,20 +98,29 @@ FILE_IN_USE_TITLE = "File is currently in use"
 FILE_IN_USE_ERROR = "Your pdf was not converted because it is currently in use. Try closing it before overwriting."
 
 INVALID_FILE_TYPE_TITLE = "Invalid file(s) selected"
-INVALID_FILE_TYPE_ERROR = "Check that only .png and .jpg images have been selected."
+INVALID_FILE_TYPE_ERROR = "Check that only .png .jpg or .bmp images have been selected."
 
 UNKNOWN_ERROR_TITLE = "An unknown error has occured"
 UNKNOWN_ERROR = "Your pdf may not have been produced correctly. Please check the log file and report it at: https://github.com/Pack-Yak1/image-to-pdf/issues"
 
 
+def displayInfo(t, m):
+    tkinter.messagebox.showinfo(title=t, message=m)
+
+
+def notifyError(t, m):
+    tkinter.messagebox.showerror(title=t, message=m)
+
+
 # Converts a supported image at [address] to a jpg image with the same name and
 # location. Returns the address of the jpg image created.
-def imgToJpg(address, index):
+def imgToJpg(address):
     with PIL.Image.open(address).convert("RGBA") as image:
+        index = len(data.createdFiles)
         image = PIL.ImageOps.exif_transpose(image)  # check for rotation
         jpgvers = PIL.Image.new("RGB", image.size, (255, 255, 255))
         jpgvers.paste(image, image)
-        jpgName = address[:index] + ".jpg"
+        jpgName = os.path.join(TEMP_DIR, "%d.jpg" % index)
         jpgvers.save(jpgName, quality=95)
         return jpgName
 
@@ -104,63 +129,57 @@ def imgToJpg(address, index):
 def checkEmptyInputs():
     # No files selected for conversion
     if data.imageNames == []:
-        tkinter.messagebox.showinfo(
-            title=NO_SELECTION_TITLE,
-            message=NO_SELECTION_PROMPT
-        )
+        displayInfo(NO_SELECTION_TITLE, NO_SELECTION_PROMPT)
         return True
     # No save path selected
     elif data.savePath == "":
-        tkinter.messagebox.showinfo(
-            title=NO_DEST_TITLE,
-            message=NO_DEST_PROMPT
-        )
+        displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT)
         return True
     else:
         return False
 
 
-# Check for data.imageNames for supported extensions and convert to jpg in place
+# Check for data.imageNames for supported extensions and convert to jpg in temp
+# directory. Replaces non-jpg version of image in data.imageNames and updates
+# data.createdFiles to include produced jpg address
 def convertImagesToJpg():
     for i in range(len(data.imageNames)):
         address = data.imageNames[i]
         extensionIndex = address.rfind(".")
         extension = address[extensionIndex:]
         if extension != ".jpg" and extension in SUPPORTED_FORMATS:
-            data.imageNames[i] = imgToJpg(address, extensionIndex)
+            jpgName = imgToJpg(address)
+            data.imageNames[i] = jpgName
+            data.createdFiles.add(jpgName)
 
 
-# TODO: Prompt user about which jpgs were created, ask if delete
+# TODO: open last produced pdf
+# TODO: reordering selected images
+# TODO: button to open log files
+# TODO: readme info (supported image types, default ordering)
+# TODO: support more image types
 def convert():
     if not checkEmptyInputs():
-        convertImagesToJpg()
         try:
+            convertImagesToJpg()
             with open(data.savePath, "wb") as f:
                 f.write(img2pdf.convert(data.imageNames))
-                tkinter.messagebox.showinfo(
-                    title=SUCCESS_TITLE,
-                    message=SUCCESS_MESSAGE()
-                )
-        # File is in use
+                displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE())
         except PermissionError:
-            tkinter.messagebox.showerror(
-                title=FILE_IN_USE_TITLE,
-                message=FILE_IN_USE_ERROR
-            )
-        # Non supported image filetypes were selected
+            # File is in use
+            notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR)
         except img2pdf.ImageOpenError:
-            tkinter.messagebox.showerror(
-                title=INVALID_FILE_TYPE_TITLE,
-                message=INVALID_FILE_TYPE_ERROR
-            )
-        # Any other error
-        except Exception as e:
-            logging.basicConfig(filename="./logs.txt", filemode="w")
+            # Non supported image filetypes were selected
+            notifyError(INVALID_FILE_TYPE_TITLE, INVALID_FILE_TYPE_ERROR)
+        except Exception:
+            # Any other error
+            logging.basicConfig(filename=LOG_FILE, filemode="w")
             logging.error(traceback.format_exc())
-            tkinter.messagebox.showerror(
-                title=UNKNOWN_ERROR_TITLE,
-                message=UNKNOWN_ERROR
-            )
+            notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR)
+        finally:
+            for path in data.createdFiles:
+                os.remove(path)
+            data.reset()
 
 
 # Default widget construction functions
@@ -185,7 +204,7 @@ def defaultButton(label, func):
                   fg=BUTTON_TEXT_COLOR)
 
 
-def Widgets():
+def widgets():
     # First row (Browse label, field, button)
     linkLabel = defaultLabel("Images selected:")
     linkLabel.grid(row=1, column=0, pady=10, padx=5)
@@ -211,5 +230,5 @@ def Widgets():
     convertButton.grid(row=3, column=1, pady=5, padx=3)
 
 
-Widgets()
+widgets()
 root.mainloop()
