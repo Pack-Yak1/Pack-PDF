@@ -7,8 +7,10 @@ from PIL import Image, ImageOps
 from traceback import format_exc
 from logging import basicConfig, error
 from os import getcwd, mkdir, path, remove, system
-from addressHolder import AddressHolder
+from addressHolder import *
 from subprocess import Popen
+from json import dump, load
+from interface import *
 
 HOME_DIR = getcwd()
 try:
@@ -18,38 +20,38 @@ except FileExistsError:
 finally:
     TEMP_DIR = path.join(HOME_DIR, "temp")
 LOG_FILE = path.join(HOME_DIR, "logs.txt")
+CONFIG_FILE = path.join(HOME_DIR, "config.json")
+
 
 # Supported image formats (besides .jpg)
 SUPPORTED_FORMATS = [".png", ".jpeg", ".bmp"]
 
 
-# Colors
-LABEL_COLOR = "#d8bc94"
-LABEL_TEXT_COLOR = "#000000"
-LABEL_BORDER_COLOR = "#98846c"
-BUTTON_COLOR = "#685444"
-BUTTON_TEXT_COLOR = "#FFFFFF"
-BACKGROUND_COLOR = "#e8dccc"
-FIELD_COLOR = "#f0ece4"
-FIELD_TEXT_COLOR = "#000000"
-
-
 # Main window
 root = Tk()
-root.geometry("500x120")
+root.geometry("500x150")
 root.resizable(0, 0)
 root.title("JPG to PDF Converter by Pack Yak1")
 root.config(background=BACKGROUND_COLOR)
 
 
-# Backend initialization
-data = AddressHolder()
+# Get config data to initialize backend
+try:
+    with open(CONFIG_FILE, "r") as f:
+        config = load(f)
+        data = AddressHolder(config)
+except FileNotFoundError:
+    with open(CONFIG_FILE, "w") as f:
+        dump(DEFAULT_CONFIG, f)
+        data = AddressHolder(DEFAULT_CONFIG)
 
 
 # Display strings & functions
 SUCCESS_TITLE = "Success!"
+SAVED_CONFIG_MESSAGE = "Default settings successfully updated"
 
 
+# Success message upon converting/combining a pdf
 def SUCCESS_MESSAGE():
     return "%d images successfully converted to PDF at %s" % (
         len(data.imageNames), data.savePath
@@ -72,8 +74,8 @@ UNKNOWN_ERROR_TITLE = "An unknown error has occured"
 UNKNOWN_ERROR = "Your pdf may not have been produced correctly. Please check the log file and report it at: https://github.com/Pack-Yak1/image-to-pdf/issues"
 
 
-def displayInfo(t, m):
-    messagebox.showinfo(title=t, message=m)
+def displayInfo(t, m, p):
+    messagebox.showinfo(title=t, message=m, parent=p)
 
 
 def notifyError(t, m):
@@ -97,11 +99,11 @@ def imgToJpg(address):
 def checkEmptyInputs():
     # No files selected for conversion
     if data.imageNames == []:
-        displayInfo(NO_SELECTION_TITLE, NO_SELECTION_PROMPT)
+        displayInfo(NO_SELECTION_TITLE, NO_SELECTION_PROMPT, root)
         return True
     # No save path selected
     elif data.savePath == "":
-        displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT)
+        displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT, root)
         return True
     else:
         return False
@@ -127,11 +129,13 @@ def unknownErrorProtocol():
     notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR)
 
 
+# Button functions
+
+
 # TODO: reordering selected images
 # TODO: readme info (supported image types, default ordering)
 # TODO: support more image types
 # TODO: combine pdf
-# TODO: default directories
 def convert():
     if not checkEmptyInputs():
         try:
@@ -139,7 +143,7 @@ def convert():
             with open(data.savePath, "wb") as f:
                 f.write(jpgConvert(data.imageNames))
                 data.lastOutputAddress = data.savePath
-                displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE())
+                displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE(), root)
         except PermissionError:
             # File is in use
             notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR)
@@ -165,64 +169,112 @@ def openLastOutput():
 
 def openLogs():
     try:
-        system("explorer %s" % HOME_DIR)
+        system("notepad %s" % LOG_FILE)
     except Exception:
         unknownErrorProtocol()
 
 
-# Default widget construction functions
+def stringVarOf(o):
+    output = StringVar()
+    if type(o) is type(""):
+        output.set(o)
+        return output
+    else:
+        raise ValueError(
+            "Attempted to call stringVarOf on non-string object"
+        )
 
 
-def defaultLabel(label):
-    # Creates a label within a border with color = LABEL_BORDER_COLOR and return
-    # the border it is packed into
-    border = Frame(root, bg=LABEL_BORDER_COLOR)
-    label = Label(border, text=label, bg=LABEL_COLOR, fg=LABEL_TEXT_COLOR,
-                  width=20)
-    label.pack(padx=1, pady=1)
-    return border
+def saveConfig(fields, topLevel):
+    try:
+        for key in fields:
+            value = fields.get(key).get()
+            if value != "":  # only update if user selects a path
+                data.config[key] = value
+        with open(CONFIG_FILE, "w") as f:
+            dump(data.config, f)
+            displayInfo(SUCCESS_TITLE, SAVED_CONFIG_MESSAGE, topLevel)
+            topLevel.destroy()
+    except Exception:
+        unknownErrorProtocol()
 
 
-def defaultField(textVar):
-    return Entry(root, width=40, textvariable=textVar, bg=FIELD_COLOR,
-                 fg=FIELD_TEXT_COLOR, relief="sunken")
+def changeDefaults():
+    defaultsWindow = defaultFrameNoResize("500x150", "Change default settings")
 
+    # StringVars for fields containing config settings
+    currentWorkspace = data.config.get("default workspace")
+    text1Ptr = stringVarOf(currentWorkspace)
+    currentDest = data.config.get("default destination")
+    text2Ptr = stringVarOf(currentDest)
 
-def defaultButton(label, func):
-    return Button(root, text=label, command=func, width=10, bg=BUTTON_COLOR,
-                  fg=BUTTON_TEXT_COLOR)
+    fields = {"default workspace": text1Ptr,
+              "default destination": text2Ptr}
+
+    # TODO: abstractify button commands, maybe make an array of stringvar ptrs
+    # First row (workspace label, field, button)
+    (workspaceLabel, workspaceText, browseButton3) = defaultRow(
+        "Default Workspace:", text1Ptr, "Browse",
+        lambda: text1Ptr.set(filedialog.askdirectory(
+            initialdir=currentWorkspace,
+            parent=defaultsWindow
+        )), defaultsWindow)
+    workspaceLabel.grid(row=1, column=0, pady=10, padx=5, columnspan=2)
+    workspaceText.grid(row=1, column=2, pady=10, padx=5, columnspan=2)
+    browseButton3.grid(row=1, column=4, pady=4, padx=1)
+
+    # Second row (destination label, field, button)
+    (destLabel, destText, browseButton4) = defaultRow(
+        "Default Save Address:", text2Ptr, "Browse",
+        lambda: text2Ptr.set(filedialog.askdirectory(
+            initialdir=currentDest,
+            parent=defaultsWindow
+        )), defaultsWindow)
+    destLabel.grid(row=2, column=0, pady=5, padx=5, columnspan=2)
+    destText.grid(row=2, column=2, pady=5, padx=5, columnspan=2)
+    browseButton4.grid(row=2, column=4, pady=4, padx=1)
+    defaultsWindow.lift()
+
+    # Third row (Save button)
+    saveButton = defaultButton("Save",
+                               lambda: saveConfig(fields, defaultsWindow),
+                               defaultsWindow)
+    saveButton.grid(row=3, column=2, pady=5, padx=3)
+    cancelButton = defaultButton("Cancel", defaultsWindow.destroy,
+                                 defaultsWindow)
+    cancelButton.grid(row=3, column=4, pady=5, padx=3)
 
 
 def widgets():
     # First row (Browse label, field, button)
-    linkLabel = defaultLabel("Images selected:")
+    (linkLabel, linkText, browseButton1) = defaultRow(
+        "Images selected:", data.nameDisplay, "Browse", data.updateImageNames,
+        root)
     linkLabel.grid(row=1, column=0, pady=10, padx=5, columnspan=2)
-
-    linkText = defaultField(data.nameDisplay)
     linkText.grid(row=1, column=2, pady=10, padx=5, columnspan=2)
-
-    browseButton1 = defaultButton("Browse", data.updateImageNames)
     browseButton1.grid(row=1, column=4, pady=4, padx=1)
 
     # Second row (Save as label, field, button)
-    destinationLabel = defaultLabel("Save to :")
+    (destinationLabel, destinationText, browseButton2) = defaultRow(
+        "Save to:", data.saveDisplay, "Browse", data.updateSavePath,
+        root)
     destinationLabel.grid(row=2, column=0, pady=5, padx=5, columnspan=2)
-
-    destinationText = defaultField(data.saveDisplay)
     destinationText.grid(row=2, column=2, pady=5, padx=5, columnspan=2)
-
-    browseButton2 = defaultButton("Browse", data.updateSavePath)
     browseButton2.grid(row=2, column=4, pady=4, padx=1)
 
-    # Third row (Convert button, open output button)
-    convertButton = defaultButton("Convert", convert)
+    # Third row (Convert button)
+    convertButton = defaultButton("Convert", convert, root)
     convertButton.grid(row=3, column=2, pady=5, padx=3)
 
-    lastOutputButton = defaultButton("Open output", openLastOutput)
-    lastOutputButton.grid(row=3, column=3, pady=5, padx=3)
+    # Fourth row(open output, defaults, log button)
+    lastOutputButton = defaultButton("Open output", openLastOutput, root)
+    lastOutputButton.grid(row=4, column=2, pady=5, padx=3)
 
-    logFileButton = defaultButton("Open logs", openLogs)
-    logFileButton.grid(row=3, column=4, pady=5, padx=3)
+    defaultsButton = defaultButton("Defaults", changeDefaults, root)
+    defaultsButton.grid(row=4, column=3, pady=5, padx=3)
+
+    logFileButton = defaultButton("Open logs", openLogs, root)
+    logFileButton.grid(row=4, column=4, pady=5, padx=3)
 
 
 widgets()
