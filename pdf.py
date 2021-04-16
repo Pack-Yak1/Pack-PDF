@@ -1,22 +1,23 @@
-from tkinter import *
-import tkinter.filedialog
-import tkinter.messagebox
-import tkinter.font
-import img2pdf
-import PIL.Image
-import PIL.ImageOps
-import traceback
-import logging
-import os
+from tkinter import (
+    Tk, filedialog, messagebox, font, StringVar, Frame, Label, Entry, Button
+)
+from img2pdf import convert as jpgConvert
+from img2pdf import ImageOpenError
+from PIL import Image, ImageOps
+from traceback import format_exc
+from logging import basicConfig, error
+from os import getcwd, mkdir, path, remove, system
+from addressHolder import AddressHolder
+from subprocess import Popen
 
-HOME_DIR = os.getcwd()
+HOME_DIR = getcwd()
 try:
-    os.mkdir(os.path.join(HOME_DIR, "temp"))
+    mkdir(path.join(HOME_DIR, "temp"))
 except FileExistsError:
     pass
 finally:
-    TEMP_DIR = os.path.join(HOME_DIR, "temp")
-LOG_FILE = os.path.join(HOME_DIR, "logs.txt")
+    TEMP_DIR = path.join(HOME_DIR, "temp")
+LOG_FILE = path.join(HOME_DIR, "logs.txt")
 
 # Supported image formats (besides .jpg)
 SUPPORTED_FORMATS = [".png", ".jpeg", ".bmp"]
@@ -41,44 +42,11 @@ root.title("JPG to PDF Converter by Pack Yak1")
 root.config(background=BACKGROUND_COLOR)
 
 
-# Stores the selected images, save path, and string variables to display in
-# fields.
-class AddressHolder:
-    def __init__(self):
-        self.imageNames = []
-        self.savePath = ""
-        self.nameDisplay = StringVar()
-        self.saveDisplay = StringVar()
-        self.createdFiles = set()
-
-    def updateImageNames(self):
-        self.imageNames = list(
-            tkinter.filedialog.askopenfilenames(
-                title="Select images to convert to PDF",
-            )
-        )
-        self.nameDisplay.set(str(self.imageNames)[1:-1].replace("'", ""))
-        self.imageNames
-
-    def updateSavePath(self):
-        self.savePath = tkinter.filedialog.asksaveasfilename(
-            defaultextension='.pdf',
-            title="Save PDF to:",
-            filetypes=[("PDF", "*.pdf")]
-        )
-        self.saveDisplay.set(self.savePath)
-
-    def reset(self):
-        self.imageNames = []
-        self.savePath = ""
-        self.nameDisplay.set("")
-        self.saveDisplay.set("")
-        self.createdFiles.clear()
-
-
+# Backend initialization
 data = AddressHolder()
 
-# Display strings
+
+# Display strings & functions
 SUCCESS_TITLE = "Success!"
 
 
@@ -105,22 +73,22 @@ UNKNOWN_ERROR = "Your pdf may not have been produced correctly. Please check the
 
 
 def displayInfo(t, m):
-    tkinter.messagebox.showinfo(title=t, message=m)
+    messagebox.showinfo(title=t, message=m)
 
 
 def notifyError(t, m):
-    tkinter.messagebox.showerror(title=t, message=m)
+    messagebox.showerror(title=t, message=m)
 
 
 # Converts a supported image at [address] to a jpg image with the same name and
 # location. Returns the address of the jpg image created.
 def imgToJpg(address):
-    with PIL.Image.open(address).convert("RGBA") as image:
+    with Image.open(address).convert("RGBA") as image:
         index = len(data.createdFiles)
-        image = PIL.ImageOps.exif_transpose(image)  # check for rotation
-        jpgvers = PIL.Image.new("RGB", image.size, (255, 255, 255))
+        image = ImageOps.exif_transpose(image)  # check for rotation
+        jpgvers = Image.new("RGB", image.size, (255, 255, 255))
         jpgvers.paste(image, image)
-        jpgName = os.path.join(TEMP_DIR, "%d.jpg" % index)
+        jpgName = path.join(TEMP_DIR, "%d.jpg" % index)
         jpgvers.save(jpgName, quality=95)
         return jpgName
 
@@ -153,36 +121,57 @@ def convertImagesToJpg():
             data.createdFiles.add(jpgName)
 
 
-# TODO: open last produced pdf
+def unknownErrorProtocol():
+    basicConfig(filename=LOG_FILE, filemode="w")
+    error(format_exc())
+    notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR)
+
+
 # TODO: reordering selected images
-# TODO: button to open log files
 # TODO: readme info (supported image types, default ordering)
 # TODO: support more image types
+# TODO: combine pdf
+# TODO: default directories
 def convert():
     if not checkEmptyInputs():
         try:
             convertImagesToJpg()
             with open(data.savePath, "wb") as f:
-                f.write(img2pdf.convert(data.imageNames))
+                f.write(jpgConvert(data.imageNames))
+                data.lastOutputAddress = data.savePath
                 displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE())
         except PermissionError:
             # File is in use
             notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR)
-        except img2pdf.ImageOpenError:
+        except ImageOpenError:
             # Non supported image filetypes were selected
             notifyError(INVALID_FILE_TYPE_TITLE, INVALID_FILE_TYPE_ERROR)
         except Exception:
             # Any other error
-            logging.basicConfig(filename=LOG_FILE, filemode="w")
-            logging.error(traceback.format_exc())
-            notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR)
+            unknownErrorProtocol()
         finally:
             for path in data.createdFiles:
-                os.remove(path)
+                remove(path)
             data.reset()
 
 
+def openLastOutput():
+    if data.lastOutputAddress != None:
+        try:
+            system(data.lastOutputAddress)
+        except Exception:
+            unknownErrorProtocol()
+
+
+def openLogs():
+    try:
+        system("explorer %s" % HOME_DIR)
+    except Exception:
+        unknownErrorProtocol()
+
+
 # Default widget construction functions
+
 
 def defaultLabel(label):
     # Creates a label within a border with color = LABEL_BORDER_COLOR and return
@@ -207,27 +196,33 @@ def defaultButton(label, func):
 def widgets():
     # First row (Browse label, field, button)
     linkLabel = defaultLabel("Images selected:")
-    linkLabel.grid(row=1, column=0, pady=10, padx=5)
+    linkLabel.grid(row=1, column=0, pady=10, padx=5, columnspan=2)
 
     linkText = defaultField(data.nameDisplay)
-    linkText.grid(row=1, column=1, pady=10, padx=5)
+    linkText.grid(row=1, column=2, pady=10, padx=5, columnspan=2)
 
     browseButton1 = defaultButton("Browse", data.updateImageNames)
-    browseButton1.grid(row=1, column=2, pady=4, padx=1)
+    browseButton1.grid(row=1, column=4, pady=4, padx=1)
 
     # Second row (Save as label, field, button)
     destinationLabel = defaultLabel("Save to :")
-    destinationLabel.grid(row=2, column=0, pady=5, padx=5)
+    destinationLabel.grid(row=2, column=0, pady=5, padx=5, columnspan=2)
 
     destinationText = defaultField(data.saveDisplay)
-    destinationText.grid(row=2, column=1, pady=5, padx=5)
+    destinationText.grid(row=2, column=2, pady=5, padx=5, columnspan=2)
 
     browseButton2 = defaultButton("Browse", data.updateSavePath)
-    browseButton2.grid(row=2, column=2, pady=4, padx=1)
+    browseButton2.grid(row=2, column=4, pady=4, padx=1)
 
-    # Third row (Convert button)
+    # Third row (Convert button, open output button)
     convertButton = defaultButton("Convert", convert)
-    convertButton.grid(row=3, column=1, pady=5, padx=3)
+    convertButton.grid(row=3, column=2, pady=5, padx=3)
+
+    lastOutputButton = defaultButton("Open output", openLastOutput)
+    lastOutputButton.grid(row=3, column=3, pady=5, padx=3)
+
+    logFileButton = defaultButton("Open logs", openLogs)
+    logFileButton.grid(row=3, column=4, pady=5, padx=3)
 
 
 widgets()
