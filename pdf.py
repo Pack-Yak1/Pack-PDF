@@ -8,7 +8,7 @@ from traceback import format_exc
 from logging import basicConfig, error
 from os import getcwd, mkdir, path, remove, system
 from addressHolder import *
-from subprocess import Popen
+from subprocess import *
 from json import dump, load
 from interface import *
 
@@ -71,15 +71,10 @@ INVALID_FILE_TYPE_TITLE = "Invalid file(s) selected"
 INVALID_FILE_TYPE_ERROR = "Check that only .png .jpg or .bmp images have been selected."
 
 UNKNOWN_ERROR_TITLE = "An unknown error has occured"
-UNKNOWN_ERROR = "Your pdf may not have been produced correctly. Please check the log file and report it at: https://github.com/Pack-Yak1/image-to-pdf/issues"
+UNKNOWN_ERROR = "Your last action may not have been executed correctly. Please check the log file and report it at: https://github.com/Pack-Yak1/image-to-pdf/issues"
 
-
-def displayInfo(t, m, p):
-    messagebox.showinfo(title=t, message=m, parent=p)
-
-
-def notifyError(t, m):
-    messagebox.showerror(title=t, message=m)
+NO_LOG_TITLE = "No logs to show"
+NO_LOG_MSG = "No errors occured so far, so no logs have been recorded."
 
 
 # Converts a supported image at [address] to a jpg image with the same name and
@@ -124,6 +119,8 @@ def convertImagesToJpg():
 
 
 def unknownErrorProtocol():
+    with open(LOG_FILE, "w") as f:
+        f.write("")
     basicConfig(filename=LOG_FILE, filemode="w")
     error(format_exc())
     notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR)
@@ -159,17 +156,29 @@ def convert():
             data.reset()
 
 
+# Code from https://stackoverflow.com/questions/7006238/how-do-i-hide-the-consol
+# e-when-i-use-os-system-or-subprocess-call/7006424#7006424
+def noCmdSystemCall(command):
+    si = STARTUPINFO()
+    si.dwFlags |= STARTF_USESHOWWINDOW
+    # si.wShowWindow = subprocess.SW_HIDE # default
+    Popen([command], shell=True, startupinfo=si)
+
+
 def openLastOutput():
     if data.lastOutputAddress != None:
         try:
-            system(data.lastOutputAddress)
+            noCmdSystemCall(data.lastOutputAddress)
         except Exception:
             unknownErrorProtocol()
 
 
 def openLogs():
     try:
-        system("notepad %s" % LOG_FILE)
+        if (path.exists(LOG_FILE)):
+            noCmdSystemCall(LOG_FILE)
+        else:
+            displayInfo(NO_LOG_TITLE, NO_LOG_MSG, root)
     except Exception:
         unknownErrorProtocol()
 

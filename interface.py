@@ -1,4 +1,4 @@
-from tkinter import Frame, Label, Entry, Button, Tk, Toplevel
+from tkinter import Frame, Label, Entry, Button, Tk, Toplevel, messagebox
 
 # Colors
 LABEL_COLOR = "#d8bc94"
@@ -48,3 +48,11 @@ def defaultRow(label, field, buttonLabel, buttonFunc, frame):
     field = defaultField(field, frame)
     button = defaultButton(buttonLabel, buttonFunc, frame)
     return(label, field, button)
+
+
+def displayInfo(t, m, p):
+    messagebox.showinfo(title=t, message=m, parent=p)
+
+
+def notifyError(t, m):
+    messagebox.showerror(title=t, message=m)
