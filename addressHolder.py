@@ -1,10 +1,6 @@
 from tkinter import StringVar, filedialog
 
 
-# Default config
-DEFAULT_CONFIG = {"default workspace": "", "default destination": ""}
-
-
 # Stores the selected images, save path, and string variables to display in
 # fields.
 class AddressHolder:
