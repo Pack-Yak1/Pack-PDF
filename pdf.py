@@ -1,5 +1,5 @@
 from tkinter import (
-    Tk, filedialog, messagebox, font, StringVar, Frame, Label, Entry, Button
+    Tk, filedialog, messagebox, font, StringVar, Frame, Label, Entry, Button, Toplevel
 )
 from img2pdf import convert as jpgConvert
 from img2pdf import ImageOpenError
@@ -8,9 +8,12 @@ from traceback import format_exc
 from logging import basicConfig, error
 from os import getcwd, mkdir, path, remove, system
 from addressHolder import *
-from subprocess import *
+from PyPDF2 import PdfFileReader, PdfFileMerger, utils
+from subprocess import Popen, STARTUPINFO, STARTF_USESHOWWINDOW
 from json import dump, load
+from stringConstants import *
 from interface import *
+
 
 HOME_DIR = getcwd()
 try:
@@ -29,9 +32,9 @@ SUPPORTED_FORMATS = [".png", ".jpeg", ".bmp"]
 
 # Main window
 root = Tk()
-root.geometry("500x290")
+root.geometry(WINDOW_SIZE)
 root.resizable(0, 0)
-root.title("JPG to PDF Converter by Pack Yak1")
+root.title(WINDOW_TITLE)
 root.config(background=BACKGROUND_COLOR)
 
 
@@ -93,15 +96,11 @@ def checkCombineEmptyInputs():
                     NO_COMBINE_SELECTION_PROMPT, root)
         return True
     # No save path selected
-    elif data.convertDest == "":
+    elif data.combineDest == "":
         displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT, root)
         return True
     else:
         return False
-
-
-def combinePDFS():
-    pass
 
 
 # Check for data.convertNames for supported extensions and convert to jpg in temp
@@ -119,11 +118,11 @@ def convertImagesToJpg():
 
 
 def unknownErrorProtocol(parent):
-    with open(LOG_FILE, "w") as f:
+    with open(LOG_FILE, "a") as f:
         f.write("")
-    basicConfig(filename=LOG_FILE, filemode="w")
+    basicConfig(filename=LOG_FILE, filemode="a")
     error(format_exc())
-    notifyError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR, parent)
+    displayError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR, parent)
 
 
 # Button functions
@@ -132,22 +131,22 @@ def unknownErrorProtocol(parent):
 # TODO: reordering selected images
 # TODO: help button (supported image types, default ordering)
 # TODO: support more image types
-# TODO: combine pdf
 # TODO: reorder pages (take last file as input button optional)
 def convert():
     if not checkConvertEmptyInputs():
         try:
             convertImagesToJpg()
             with open(data.convertDest, "wb") as f:
-                f.write(jpgConvert(data.imageNames))
+                f.write(jpgConvert(data.convertNames))
                 data.lastOutputAddress = data.convertDest
-                displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE(data), root)
+                displayInfo(SUCCESS_TITLE, CONVERT_SUCCESS_MESSAGE(data), root)
         except PermissionError:
             # File is in use
-            notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
+            displayError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
         except ImageOpenError:
             # Non supported image filetypes were selected
-            notifyError(INVALID_FILE_TYPE_TITLE, INVALID_FILE_TYPE_ERROR, root)
+            displayError(INVALID_FILE_TYPE_TITLE,
+                         CONVERT_INVALID_FILE_TYPE_ERROR, root)
         except Exception:
             # Any other error
             unknownErrorProtocol(root)
@@ -160,15 +159,19 @@ def convert():
 def combine():
     if not checkCombineEmptyInputs():
         try:
-            combinePDFs()
-            with open(data.combineDest, "wb") as f:
-                pass
+            merger = PdfFileMerger(strict=False)
+            for pdfName in data.combineNames:
+                merger.append(pdfName)
+            merger.write(data.combineDest)
+            data.lastOutputAddress = data.combineDest
+            displayInfo(SUCCESS_TITLE, COMBINE_SUCCESS_MESSAGE(data), root)
         except PermissionError:
             # File is in use
-            notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
-        except ImageOpenError:  # TODO: change this to non pdf selected error
-            # Non supported image filetypes were selected
-            notifyError(INVALID_FILE_TYPE_TITLE, INVALID_FILE_TYPE_ERROR, root)
+            displayError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
+        except utils.PdfReadError:
+            # Non PDF files were selected
+            displayError(INVALID_FILE_TYPE_TITLE,
+                         COMBINE_INVALID_FILE_TYPE_ERROR, root)
         except Exception:
             # Any other error
             unknownErrorProtocol(root)
@@ -209,9 +212,7 @@ def stringVarOf(o):
         output.set(o)
         return output
     else:
-        raise ValueError(
-            "Attempted to call stringVarOf on non-string object"
-        )
+        raise ValueError(STRINGVAR_GENERATION_TYPE_ERROR)
 
 
 def saveConfig(fields, topLevel):
@@ -265,7 +266,9 @@ def changeDefaults():
     fields = {"default workspace": text1Ptr,
               "default destination": text2Ptr}
 
-    defaultsWindow = defaultFrameNoResize("585x160", "Change default settings")
+    tl = Toplevel()
+    defaultsWindow = defaultFrameNoResize(
+        tl, "585x160", "Change default settings")
     rowNumber = 0
 
     # First row (workspace label, field, button)
@@ -332,7 +335,7 @@ def widgets():
     # Second row (Save as label, field, button)
     defaultRow(
         rowNumber,
-        "Save to:", data.convertSaveDisplay,
+        "Save to:", data.convertDestDisplay,
         "Browse", data.updateConvertDest,
         root
     )
@@ -355,7 +358,7 @@ def widgets():
     # Fifth row (Save as label, field, button)
     defaultRow(
         rowNumber,
-        "Save to:", data.combineSaveDisplay,
+        "Save to:", data.combineDestDisplay,
         "Browse", data.updateCombineDest,
         root
     )

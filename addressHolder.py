@@ -14,13 +14,13 @@ class AddressHolder:
         self.convertNames = []
         self.convertDest = ""
         self.convertNameDisplay = StringVar()
-        self.convertSaveDisplay = StringVar()
+        self.convertDestDisplay = StringVar()
 
         # Used by combine pdf
         self.combineNames = []
         self.combineDest = ""
         self.combineNameDisplay = StringVar()
-        self.combineSaveDisplay = StringVar()
+        self.combineDestDisplay = StringVar()
 
     # Updates the text displayed in images selected for conversion field
     def updateConvertNames(self):
@@ -41,14 +41,14 @@ class AddressHolder:
             filetypes=[("PDF", "*.pdf")],
             initialdir=self.config.get("default destination")
         )
-        self.convertSaveDisplay.set(self.convertDest)
+        self.convertDestDisplay.set(self.convertDest)
 
     # Reset the convert image to pdf fields
     def resetConvert(self):
         self.convertNames = []
         self.convertDest = ""
         self.convertNameDisplay.set("")
-        self.convertSaveDisplay.set("")
+        self.convertDestDisplay.set("")
         self.createdFiles.clear()
 
     def updateCombineNames(self):
@@ -56,7 +56,7 @@ class AddressHolder:
             filedialog.askopenfilenames(
                 title="Select PDFs to combine",
                 initialdir=self.config.get("default workspace"),
-                defaultextension=".pdf"
+                filetypes=[("PDF", "*.pdf")]
             )
         )
         self.combineNameDisplay.set(
@@ -70,4 +70,11 @@ class AddressHolder:
             filetypes=[("PDF", "*.pdf")],
             initialdir=self.config.get("default destination")
         )
-        self.combineSaveDisplay.set(self.combineDest)
+        self.combineDestDisplay.set(self.combineDest)
+
+    # Reset combine pdf fields
+    def resetCombine(self):
+        self.combineNames = []
+        self.combineDest = ""
+        self.combineNameDisplay.set("")
+        self.combineDestDisplay.set("")
