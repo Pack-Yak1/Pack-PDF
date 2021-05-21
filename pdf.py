@@ -29,7 +29,7 @@ SUPPORTED_FORMATS = [".png", ".jpeg", ".bmp"]
 
 # Main window
 root = Tk()
-root.geometry("500x160")
+root.geometry("500x290")
 root.resizable(0, 0)
 root.title("JPG to PDF Converter by Pack Yak1")
 root.config(background=BACKGROUND_COLOR)
@@ -72,30 +72,49 @@ def imgToJpg(address):
 
 
 # Checks if user attempted to convert without selecting files and destination
-def checkEmptyInputs():
+def checkConvertEmptyInputs():
     # No files selected for conversion
-    if data.imageNames == []:
-        displayInfo(NO_SELECTION_TITLE, NO_SELECTION_PROMPT, root)
+    if data.convertNames == []:
+        displayInfo(NO_CONVERT_SELECTION_TITLE,
+                    NO_CONVERT_SELECTION_PROMPT, root)
         return True
     # No save path selected
-    elif data.savePath == "":
+    elif data.convertDest == "":
         displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT, root)
         return True
     else:
         return False
 
 
-# Check for data.imageNames for supported extensions and convert to jpg in temp
-# directory. Replaces non-jpg version of image in data.imageNames and updates
+def checkCombineEmptyInputs():
+    # No PDFs selected for combining
+    if data.combineNames == []:
+        displayInfo(NO_COMBINE_SELECTION_TITLE,
+                    NO_COMBINE_SELECTION_PROMPT, root)
+        return True
+    # No save path selected
+    elif data.convertDest == "":
+        displayInfo(NO_DEST_TITLE, NO_DEST_PROMPT, root)
+        return True
+    else:
+        return False
+
+
+def combinePDFS():
+    pass
+
+
+# Check for data.convertNames for supported extensions and convert to jpg in temp
+# directory. Replaces non-jpg version of image in data.convertNames and updates
 # data.createdFiles to include produced jpg address
 def convertImagesToJpg():
-    for i in range(len(data.imageNames)):
-        address = data.imageNames[i]
+    for i in range(len(data.convertNames)):
+        address = data.convertNames[i]
         extensionIndex = address.rfind(".")
         extension = address[extensionIndex:]
         if extension != ".jpg" and extension in SUPPORTED_FORMATS:
             jpgName = imgToJpg(address)
-            data.imageNames[i] = jpgName
+            data.convertNames[i] = jpgName
             data.createdFiles.add(jpgName)
 
 
@@ -116,12 +135,12 @@ def unknownErrorProtocol(parent):
 # TODO: combine pdf
 # TODO: reorder pages (take last file as input button optional)
 def convert():
-    if not checkEmptyInputs():
+    if not checkConvertEmptyInputs():
         try:
             convertImagesToJpg()
-            with open(data.savePath, "wb") as f:
+            with open(data.convertDest, "wb") as f:
                 f.write(jpgConvert(data.imageNames))
-                data.lastOutputAddress = data.savePath
+                data.lastOutputAddress = data.convertDest
                 displayInfo(SUCCESS_TITLE, SUCCESS_MESSAGE(data), root)
         except PermissionError:
             # File is in use
@@ -135,7 +154,26 @@ def convert():
         finally:
             for path in data.createdFiles:
                 remove(path)
-            data.reset()
+            data.resetConvert()
+
+
+def combine():
+    if not checkCombineEmptyInputs():
+        try:
+            combinePDFs()
+            with open(data.combineDest, "wb") as f:
+                pass
+        except PermissionError:
+            # File is in use
+            notifyError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
+        except ImageOpenError:  # TODO: change this to non pdf selected error
+            # Non supported image filetypes were selected
+            notifyError(INVALID_FILE_TYPE_TITLE, INVALID_FILE_TYPE_ERROR, root)
+        except Exception:
+            # Any other error
+            unknownErrorProtocol(root)
+        finally:
+            data.resetCombine()
 
 
 # Code from https://stackoverflow.com/questions/7006238/how-do-i-hide-the-consol
@@ -187,7 +225,7 @@ def saveConfig(fields, topLevel):
             displayInfo(SUCCESS_TITLE, SAVED_CONFIG_MESSAGE, topLevel)
             topLevel.destroy()
     except Exception:
-        unknownErrorProtocol()
+        unknownErrorProtocol(topLevel)
 
 
 def resetConfigField(txtPtr, key, value, topLevel):
@@ -285,8 +323,8 @@ def widgets():
     # First row (Browse label, field, button)
     defaultRow(
         rowNumber,
-        "Images selected:", data.nameDisplay,
-        "Browse", data.updateImageNames,
+        "Images selected:", data.convertNameDisplay,
+        "Browse", data.updateConvertNames,
         root
     )
     rowNumber += 1
@@ -294,8 +332,8 @@ def widgets():
     # Second row (Save as label, field, button)
     defaultRow(
         rowNumber,
-        "Save to:", data.saveDisplay,
-        "Browse", data.updateSavePath,
+        "Save to:", data.convertSaveDisplay,
+        "Browse", data.updateConvertDest,
         root
     )
     rowNumber += 1
@@ -305,7 +343,30 @@ def widgets():
     convertButton.grid(row=rowNumber, column=2, pady=5, padx=3)
     rowNumber += 1
 
-    # Fourth row(open output, defaults, log button)
+    # Fourth row (Select PDFs to combine)
+    defaultRow(
+        rowNumber,
+        "PDFs selected:", data.combineNameDisplay,
+        "Browse", data.updateCombineNames,
+        root
+    )
+    rowNumber += 1
+
+    # Fifth row (Save as label, field, button)
+    defaultRow(
+        rowNumber,
+        "Save to:", data.combineSaveDisplay,
+        "Browse", data.updateCombineDest,
+        root
+    )
+    rowNumber += 1
+
+    # Sixth row (Combine button)
+    convertButton = defaultButton("Combine", combine, root)
+    convertButton.grid(row=rowNumber, column=2, pady=5, padx=3)
+    rowNumber += 1
+
+    # Last row(open output, defaults, log button)
     lastOutputButton = defaultButton("Open output", openLastOutput, root)
     lastOutputButton.grid(row=rowNumber, column=2, pady=5, padx=3)
 

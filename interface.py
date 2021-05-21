@@ -30,8 +30,11 @@ RESET_ALL_MESSAGE = "Are you sure you wish to reset all configurations to defaul
 CORRUPT_CONFIG_TITLE = "Config file improperly formatted"
 CORRUPT_CONFIG_MESSAGE = "The config file is improperly formatted and needs to be reset to continue. Your settings will be reset if you continue"
 
-NO_SELECTION_TITLE = "No images selected for conversion"
-NO_SELECTION_PROMPT = "Please select images before clicking Convert."
+NO_CONVERT_SELECTION_TITLE = "No images selected for conversion"
+NO_CONVERT_SELECTION_PROMPT = "Please select images before clicking Convert."
+
+NO_COMBINE_SELECTION_TITLE = "No PDFs selected for combining"
+NO_COMBINE_SELECTION_PROMPT = "Please select PDFs "
 
 NO_DEST_TITLE = "No save path selected"
 NO_DEST_PROMPT = "Please select a destination to save pdf to."
