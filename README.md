@@ -1,2 +1,2 @@
-# image-to-pdf
-My own image to pdf converter so I can submit homework faster
+# Pack-PDF
+My own image to pdf converter and pdf combiner so I can submit homework faster
