@@ -54,3 +54,6 @@ STRINGVAR_GENERATION_TYPE_ERROR = "Attempted to call stringVarOf on non-string o
 QUALITY_FIELD_DEFAULT = "(Quality)"
 QUALITY_ERROR_TITLE = "Incorrect format for quality"
 QUALITY_ERROR = "Please either leave quality blank, or enter an integer from 1 to 95. Decimals are not allowed."
+
+NO_OUTPUT_TITLE = "No output produced yet"
+NO_OUTPUT_MSG = "No PDFs have been produced since Pack-PDF was opened, so no output could be found."

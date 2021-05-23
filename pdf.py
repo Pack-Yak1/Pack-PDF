@@ -226,9 +226,13 @@ def noCmdSystemCall(command):
 
 
 def findLastOutput():
-    fileName = data.lastOutputAddress
-    folderName = path.split(fileName)[0]
-    startfile(folderName)
+    try:
+        fileName = data.lastOutputAddress
+        folderName = path.split(fileName)[0]
+        startfile(folderName)
+    except TypeError:
+        displayInfo(NO_OUTPUT_TITLE, NO_OUTPUT_MSG, root)
+
 
 def openLastOutput():
     if data.lastOutputAddress != None:
@@ -236,6 +240,8 @@ def openLastOutput():
             noCmdSystemCall(data.lastOutputAddress)
         except Exception:
             unknownErrorProtocol(root)
+    else:
+        displayInfo(NO_OUTPUT_TITLE, NO_OUTPUT_MSG, root)
 
 
 def openLogs():
