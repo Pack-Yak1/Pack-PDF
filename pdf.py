@@ -6,7 +6,7 @@ from img2pdf import ImageOpenError
 from PIL import Image, ImageOps, UnidentifiedImageError
 from traceback import format_exc
 from logging import basicConfig, error
-from os import getcwd, mkdir, path, remove, system
+from os import getcwd, mkdir, path, remove, system, startfile
 from addressHolder import *
 from PyPDF2 import PdfFileReader, PdfFileMerger, utils
 from subprocess import Popen, STARTUPINFO, STARTF_USESHOWWINDOW
@@ -175,7 +175,6 @@ def convert():
                 f.write(jpgConvert(data.convertNames, dpi=72))
                 data.lastOutputAddress = data.convertDest
                 displayInfo(SUCCESS_TITLE, CONVERT_SUCCESS_MESSAGE(data), root)
-                data.resetConvert()
         except ValueError:
             displayError(QUALITY_ERROR_TITLE, QUALITY_ERROR, root)
         except PermissionError:
@@ -191,7 +190,7 @@ def convert():
         finally:
             for path in data.createdFiles:
                 remove(path)
-            data.createdFiles.clear()
+            data.resetConvert()
 
 
 def combine():
@@ -225,6 +224,11 @@ def noCmdSystemCall(command):
     # si.wShowWindow = subprocess.SW_HIDE # default
     Popen([command], shell=True, startupinfo=si)
 
+
+def findLastOutput():
+    fileName = data.lastOutputAddress
+    folderName = path.split(fileName)[0]
+    startfile(folderName)
 
 def openLastOutput():
     if data.lastOutputAddress != None:
@@ -414,7 +418,10 @@ def widgets():
     convertButton.grid(row=rowNumber, column=2, pady=5, padx=3)
     rowNumber += 1
 
-    # Last row(open output, defaults, log button)
+    # Last row(find output, open output, defaults, log button)
+    findOutputButton = defaultButton("Find output", findLastOutput, root)
+    findOutputButton.grid(row=rowNumber, column=1, pady=5, padx=3)
+
     lastOutputButton = defaultButton("Open output", openLastOutput, root)
     lastOutputButton.grid(row=rowNumber, column=2, pady=5, padx=3)
 

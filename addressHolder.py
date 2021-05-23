@@ -49,6 +49,7 @@ class AddressHolder:
         self.convertDest = ""
         self.convertNameDisplay.set("")
         self.convertDestDisplay.set("")
+        self.createdFiles.clear()
 
     def updateCombineNames(self):
         self.combineNames = list(
