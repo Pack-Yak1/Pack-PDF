@@ -50,3 +50,7 @@ NO_LOG_TITLE = "No logs to show"
 NO_LOG_MSG = "No errors occured so far, so no logs have been recorded."
 
 STRINGVAR_GENERATION_TYPE_ERROR = "Attempted to call stringVarOf on non-string object"
+
+QUALITY_FIELD_DEFAULT = "(Quality)"
+QUALITY_ERROR_TITLE = "Incorrect format for quality"
+QUALITY_ERROR = "Please either leave quality blank, or enter an integer from 1 to 95. Decimals are not allowed."

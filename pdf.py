@@ -3,7 +3,7 @@ from tkinter import (
 )
 from img2pdf import convert as jpgConvert
 from img2pdf import ImageOpenError
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from traceback import format_exc
 from logging import basicConfig, error
 from os import getcwd, mkdir, path, remove, system
@@ -15,6 +15,7 @@ from stringConstants import *
 from interface import *
 
 
+# Temporary file, log file and config file paths
 HOME_DIR = getcwd()
 try:
     mkdir(path.join(HOME_DIR, "temp"))
@@ -24,6 +25,10 @@ finally:
     TEMP_DIR = path.join(HOME_DIR, "temp")
 LOG_FILE = path.join(HOME_DIR, "logs.txt")
 CONFIG_FILE = path.join(HOME_DIR, "config.json")
+
+
+# Default config
+DEFAULT_CONFIG = {"default workspace": "", "default destination": ""}
 
 
 # Supported image formats (besides .jpg)
@@ -36,10 +41,6 @@ root.geometry(WINDOW_SIZE)
 root.resizable(0, 0)
 root.title(WINDOW_TITLE)
 root.config(background=BACKGROUND_COLOR)
-
-
-# Default config
-DEFAULT_CONFIG = {"default workspace": "", "default destination": ""}
 
 
 # Get config data to initialize backend
@@ -61,16 +62,23 @@ except FileNotFoundError:
         data = AddressHolder(DEFAULT_CONFIG)
 
 
-# Converts a supported image at [address] to a jpg image with the same name and
-# location. Returns the address of the jpg image created.
-def imgToJpg(address):
+def assignTmpName(address):
+    index = len(data.createdFiles)
+    return path.join(TEMP_DIR, "%d.jpg" % index)
+
+
+# Converts a supported image at [address] to a jpg image with the same name in
+# the temporary file directory. Returns the address of the jpg image created.
+def imgToJpg(address, q):
     with Image.open(address).convert("RGBA") as image:
-        index = len(data.createdFiles)
         image = ImageOps.exif_transpose(image)  # check for rotation
         jpgvers = Image.new("RGB", image.size, (255, 255, 255))
         jpgvers.paste(image, image)
-        jpgName = path.join(TEMP_DIR, "%d.jpg" % index)
-        jpgvers.save(jpgName, quality=95)
+        jpgName = assignTmpName(address)
+        if q != -1:
+            jpgvers.save(jpgName, quality=q)
+        else:
+            jpgvers.save(jpgName, quality=95)
         return jpgName
 
 
@@ -103,18 +111,33 @@ def checkCombineEmptyInputs():
         return False
 
 
+# Compresses the image at [address] and stores it in TEMP_DIR.
+# Requires: 0 < q < 1
+def compress(address, q):
+    with Image.open(address) as f:
+        outputName = assignTmpName(address)
+        f = ImageOps.exif_transpose(f)  # check for rotation
+        f.save(outputName, optimize=True, quality=q)
+        return outputName
+
+
 # Check for data.convertNames for supported extensions and convert to jpg in temp
 # directory. Replaces non-jpg version of image in data.convertNames and updates
-# data.createdFiles to include produced jpg address
-def convertImagesToJpg():
+# data.createdFiles to include produced jpg address. Also creates lower quality
+# temp versions of images to be converted to PDF.
+def preprocessImages(q):
     for i in range(len(data.convertNames)):
         address = data.convertNames[i]
         extensionIndex = address.rfind(".")
         extension = address[extensionIndex:]
         if extension != ".jpg" and extension in SUPPORTED_FORMATS:
-            jpgName = imgToJpg(address)
+            jpgName = imgToJpg(address, q)
             data.convertNames[i] = jpgName
             data.createdFiles.add(jpgName)
+        elif q != -1:  # User specified to compress images
+            compressedName = compress(data.convertNames[i], q)
+            data.convertNames[i] = compressedName
+            data.createdFiles.add(compressedName)
 
 
 def unknownErrorProtocol(parent):
@@ -124,6 +147,17 @@ def unknownErrorProtocol(parent):
     error(format_exc())
     displayError(UNKNOWN_ERROR_TITLE, UNKNOWN_ERROR, parent)
 
+
+# Check the user's desired quality for images to be converted to pdf
+def parseQuality():
+    qStr = qualityVar.get()
+    if qStr == QUALITY_FIELD_DEFAULT or qStr == "":
+        return -1
+    qInt = int(qStr)
+    if not (1 <= qInt <= 95):
+        raise ValueError
+    else:
+        return qInt
 
 # Button functions
 
@@ -135,15 +169,19 @@ def unknownErrorProtocol(parent):
 def convert():
     if not checkConvertEmptyInputs():
         try:
-            convertImagesToJpg()
+            q = parseQuality()
+            preprocessImages(q)
             with open(data.convertDest, "wb") as f:
-                f.write(jpgConvert(data.convertNames))
+                f.write(jpgConvert(data.convertNames, dpi=72))
                 data.lastOutputAddress = data.convertDest
                 displayInfo(SUCCESS_TITLE, CONVERT_SUCCESS_MESSAGE(data), root)
+                data.resetConvert()
+        except ValueError:
+            displayError(QUALITY_ERROR_TITLE, QUALITY_ERROR, root)
         except PermissionError:
             # File is in use
             displayError(FILE_IN_USE_TITLE, FILE_IN_USE_ERROR, root)
-        except ImageOpenError:
+        except (ImageOpenError, UnidentifiedImageError):
             # Non supported image filetypes were selected
             displayError(INVALID_FILE_TYPE_TITLE,
                          CONVERT_INVALID_FILE_TYPE_ERROR, root)
@@ -153,7 +191,7 @@ def convert():
         finally:
             for path in data.createdFiles:
                 remove(path)
-            data.resetConvert()
+            data.createdFiles.clear()
 
 
 def combine():
@@ -321,6 +359,10 @@ def changeDefaults():
     defaultsWindow.lift()
 
 
+# StringVars for accessing globally
+qualityVar = stringVarOf(QUALITY_FIELD_DEFAULT)
+
+
 def widgets():
     rowNumber = 0
     # First row (Browse label, field, button)
@@ -341,9 +383,12 @@ def widgets():
     )
     rowNumber += 1
 
-    # Third row (Convert button)
+    # Third row (Convert button, quality label + field)
     convertButton = defaultButton("Convert", convert, root)
     convertButton.grid(row=rowNumber, column=2, pady=5, padx=3)
+    qualityField = Entry(root, width=12, textvariable=qualityVar, justify="center",
+                         bg=FIELD_COLOR, fg=FIELD_TEXT_COLOR, relief="sunken")
+    qualityField.grid(row=rowNumber, column=4, pady=10, padx=5)
     rowNumber += 1
 
     # Fourth row (Select PDFs to combine)

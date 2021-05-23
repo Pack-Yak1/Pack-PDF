@@ -7,8 +7,8 @@ _LABEL_BORDER_COLOR = "#98846c"
 _BUTTON_COLOR = "#685444"
 _BUTTON_TEXT_COLOR = "#FFFFFF"
 BACKGROUND_COLOR = "#e8dccc"
-_FIELD_COLOR = "#f0ece4"
-_FIELD_TEXT_COLOR = "#000000"
+FIELD_COLOR = "#f0ece4"
+FIELD_TEXT_COLOR = "#000000"
 
 
 # Default widget/frame construction functions
@@ -31,8 +31,8 @@ def _defaultLabel(label, frame):
 
 
 def _defaultField(textVar, frame):
-    return Entry(frame, width=35, textvariable=textVar, bg=_FIELD_COLOR,
-                 fg=_FIELD_TEXT_COLOR, relief="sunken")
+    return Entry(frame, width=35, textvariable=textVar, bg=FIELD_COLOR,
+                 fg=FIELD_TEXT_COLOR, relief="sunken")
 
 
 def defaultButton(label, func, frame):
