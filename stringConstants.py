@@ -1,5 +1,5 @@
 WINDOW_TITLE = "JPG to PDF Converter by Pack Yak1"
-WINDOW_SIZE = "437x290"
+WINDOW_SIZE = "442x290"
 
 # Display strings & functions
 SUCCESS_TITLE = "Success!"

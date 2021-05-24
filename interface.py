@@ -20,17 +20,17 @@ def defaultFrameNoResize(output, geom, title):
     return output
 
 
-def _defaultLabel(label, frame):
+def defaultLabel(label, frame):
     # Creates a label within a border with color = LABEL_BORDER_COLOR and return
     # the border it is packed into
     border = Frame(frame, bg=_LABEL_BORDER_COLOR)
     label = Label(border, text=label, bg=_LABEL_COLOR, fg=_LABEL_TEXT_COLOR,
-                  width=15)
+                  width=16)
     label.pack(padx=1, pady=1)
     return border
 
 
-def _defaultField(textVar, frame):
+def defaultField(textVar, frame):
     return Entry(frame, width=35, textvariable=textVar, bg=FIELD_COLOR,
                  fg=FIELD_TEXT_COLOR, relief="sunken")
 
@@ -42,10 +42,10 @@ def defaultButton(label, func, frame):
 
 # Consists of a label, a text field, and a button
 def defaultRow(rowNumber, label, field, buttonLabel, buttonFunc, frame):
-    label = _defaultLabel(label, frame)
+    label = defaultLabel(label, frame)
     label.grid(row=rowNumber, column=0, pady=10, padx=5, columnspan=2)
 
-    field = _defaultField(field, frame)
+    field = defaultField(field, frame)
     field.grid(row=rowNumber, column=2, pady=10, padx=5, columnspan=2)
 
     button = defaultButton(buttonLabel, buttonFunc, frame)
